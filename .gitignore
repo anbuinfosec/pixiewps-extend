@@ -1,0 +1,19 @@
+# Files
+*~
+pixiewps
+pixiewrapper
+
+# build folder (but allow build.sh as it's a recipe file)
+/build/
+/build-android/
+*.build
+
+# Extensions
+*.o
+*.d
+*.a
+*.so
+*.out
+*.exe
+wipwn/*
+wipwn/*.py

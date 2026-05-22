@@ -1,0 +1,18 @@
+Package: pixiewps-extend
+Version: 1.4.4-1
+Architecture: arm64
+Maintainer: @anbuinfosec <anbuinfosec@gmail.com>
+Homepage: https://github.com/anbuinfosec/pixiewps-extend
+Depends: libc++
+Description: WPS pixie-dust attack tool with worldwide router database
+ pixiewps is a tool dedicated to brute force attack against Wifi Protected
+ Setup (WPS) registrar PIN. It is meant to be launched against WiFi routers,
+ it implements a last resume mechanism.
+ .
+ This enhanced v1.4.4 version includes:
+ - Worldwide router database (65+ models)
+ - Regional optimization for South/Southeast Asia, East Asia, North America, Europe
+ - Auto-detection with confidence scoring
+ - Retry mechanism with backoff
+ - Support for 20+ router modes
+ - Statistics and performance tracking

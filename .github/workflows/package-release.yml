@@ -1,0 +1,94 @@
+name: Package Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build-and-release:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            artifact_name: pixiewps-extend-linux-arm64
+            build_cmd: |
+              mkdir -p build && cd build
+              cmake -DCMAKE_BUILD_TYPE=Release ..
+              cmake --build . --config Release
+          - os: macos-latest
+            artifact_name: pixiewps-extend-macos-arm64
+            build_cmd: |
+              mkdir -p build && cd build
+              cmake -DCMAKE_BUILD_TYPE=Release ..
+              cmake --build . --config Release
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install dependencies (Ubuntu)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake build-essential
+
+      - name: Install dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install cmake
+
+      - name: Build
+        run: ${{ matrix.build_cmd }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: build/pixiewps-1.2
+
+  create-release:
+    needs: build-and-release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            pixiewps-extend-linux-arm64/pixiewps-1.2
+            pixiewps-extend-macos-arm64/pixiewps-1.2
+          body: |
+            # pixiewps-extend v${{ github.ref_name }}
+            
+            Enhanced WPS attack tool with worldwide router database support.
+            
+            ## Features
+            - 65+ router database with regional optimization
+            - Auto-detection with confidence scoring
+            - Support for 20+ router modes
+            - Retry mechanism with intelligent backoff
+            - Statistics tracking
+            
+            ## Installation
+            
+            ### Termux
+            ```bash
+            pkg install pixiewps-extend
+            ```
+            
+            ### Manual
+            ```bash
+            wget https://github.com/anbuinfosec/pixiewps-extend/releases/download/${{ github.ref_name }}/pixiewps-1.2
+            chmod +x pixiewps-1.2
+            ./pixiewps-1.2 --help
+            ```
+            
+            ## Modified by @anbuinfosec
+            GitHub: https://github.com/anbuinfosec/pixiewps-extend
