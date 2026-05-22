@@ -467,7 +467,7 @@ uint8_t router_detect_static_key_vulnerability(const uint8_t *p1, const uint8_t 
 int router_calculate_pin_from_static_key(const uint8_t *p, const uint8_t *b, uint32_t *pc, uint32_t *c) { if (c) *c = 0; return 0; }
 int router_add_static_key_model(const char *o, const char *m, uint8_t v) { return 0; }
 int wps_detect_static_ephemeral_key(const uint8_t *p1, const uint8_t *p2, uint16_t l) { return 0; }
-uint32_t wps_extract_pins_from_static_pke(const uint8_t *p, const uint8_t *pr, uint32_t *pc, uint32_t *m) { if (m) *m = 0; return 0; }
+uint32_t wps_extract_pins_from_static_pke(const uint8_t *p, const uint8_t *pr, uint32_t *pc, uint32_t m) { if (pc) *pc = 0; return 0; }
 uint8_t wps_analyze_pke_entropy(const uint8_t *p) { return 128; }
 int wps_detect_pke_weak_patterns(const uint8_t *p) { return 0; }
 struct router_model *router_get_database(uint32_t *c) { if (c) *c = 0; return NULL; }
