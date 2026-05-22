@@ -364,6 +364,89 @@ uint32_t wps_get_successful_attacks(struct wps_engine *e) { return 0; }
 void wps_cleanup_expired_sessions(struct wps_engine *e, uint32_t t) {}
 void wps_cleanup_locked_sessions(struct wps_engine *e) {}
 
+/* ===== handshake_capture.c ===== */
+#include "handshake_capture.h"
+
+struct handshake_engine *handshake_engine_init(uint32_t max_records) {
+	struct handshake_engine *e = malloc(sizeof(*e));
+	if (!e) return NULL;
+	e->max_records = max_records ? max_records : 256;
+	e->records = malloc(sizeof(struct handshake_record) * e->max_records);
+	if (!e->records) { free(e); return NULL; }
+	e->record_count = 0;
+	e->auto_deauth_enabled = 0;
+	e->deauth_count = 0;
+	e->last_deauth = 0;
+	return e;
+}
+
+void handshake_engine_free(struct handshake_engine *engine) {
+	if (engine) { free(engine->records); free(engine); }
+}
+
+int handshake_add_message(struct handshake_engine *e, const uint8_t *b, const uint8_t *s, uint8_t sl, const uint8_t *m, uint16_t ml) { return e ? 1 : 0; }
+int handshake_parse_eapol(const uint8_t *f, uint16_t fl, struct eapol_header *h) { return 0; }
+struct handshake_record *handshake_find_record(struct handshake_engine *e, const uint8_t *b) { return e && e->record_count > 0 ? &e->records[0] : NULL; }
+struct handshake_record *handshake_get_best_target(struct handshake_engine *e) { return e && e->record_count > 0 ? &e->records[0] : NULL; }
+int handshake_is_complete(struct handshake_record *r) { return r ? 1 : 0; }
+int handshake_export_pcap(struct handshake_engine *e, const char *f) { return 1; }
+int handshake_monitor_for_reassoc(struct handshake_engine *e, const uint8_t *b, uint32_t t) { return 1; }
+void handshake_cleanup_expired(struct handshake_engine *e, uint32_t t) {}
+uint32_t handshake_get_complete_count(struct handshake_engine *e) { return e ? 0 : 0; }
+uint32_t handshake_get_partial_count(struct handshake_engine *e) { return e ? 0 : 0; }
+void handshake_print_stats(struct handshake_engine *e) {}
+
+/* ===== wpa3_handler.c ===== */
+#include "wpa3_handler.h"
+
+struct wpa3_handler *wpa3_handler_init(void) {
+	struct wpa3_handler *h = malloc(sizeof(*h));
+	if (!h) return NULL;
+	h->pmkid_count = 0;
+	h->pmkid_candidates = malloc(sizeof(struct pmkid_candidate) * 256);
+	h->transition_count = 0;
+	h->transition_networks = malloc(sizeof(struct wpa3_transition) * 64);
+	h->cache_size = 128;
+	h->pmkid_cache = malloc(sizeof(struct pmkid_cache) * 128);
+	h->sae_count = 0;
+	h->sae_ctx = NULL;
+	h->last_update = 0;
+	return h;
+}
+
+void wpa3_handler_free(struct wpa3_handler *handler) {
+	if (handler) {
+		free(handler->pmkid_candidates);
+		free(handler->transition_networks);
+		free(handler->pmkid_cache);
+		free(handler);
+	}
+}
+
+int wpa3_add_pmkid_candidate(struct wpa3_handler *h, const uint8_t *b, const uint8_t *s, uint8_t sl, const uint8_t *p) { return h ? 1 : 0; }
+int wpa3_detect_transition_mode(struct wpa3_handler *h, const uint8_t *b, const char *ss, uint8_t enc) { return 0; }
+struct wpa3_transition *wpa3_find_transition(struct wpa3_handler *h, const uint8_t *b) { return NULL; }
+int wpa3_sae_init_context(struct wpa3_handler *h, const uint8_t *m, const uint8_t *b, const char *s) { return 0; }
+int wpa3_is_vulnerable_to_cv2_1_114(struct wpa3_handler *h, const uint8_t *b) { return 0; }
+int wpa3_is_vulnerable_to_dragonblood(struct wpa3_handler *h, const uint8_t *b) { return 0; }
+int wpa3_exploit_dragonblood_side_channel(struct wpa3_handler *h, const uint8_t *b) { return 0; }
+int wpa3_is_transition_mode_vulnerable(struct wpa3_handler *h, const struct wpa3_transition *t) { return 0; }
+int wpa3_attack_transition_mode(struct wpa3_handler *h, const uint8_t *b, const char *p) { return 0; }
+int wpa3_crack_pmkid_online(struct wpa3_handler *h, const uint8_t *b, const char *w) { return 0; }
+int wpa3_crack_pmkid_offline(const uint8_t *p, const char *w) { return 0; }
+int wpa3_is_owe_curve_weak(struct wpa3_handler *h, const uint8_t *b) { return 0; }
+int wpa3_is_vulnerable_cve_2023_41042(struct wpa3_handler *h) { return 0; }
+int wpa3_is_dual_mode_device(struct wpa3_handler *h, const uint8_t *b) { return 0; }
+void wpa3_add_to_pmkid_cache(struct wpa3_handler *h, const uint8_t *p, const uint8_t *b, const uint8_t *s, uint8_t sl) {}
+struct pmkid_cache *wpa3_get_pmkid_by_priority(struct wpa3_handler *h) { return h && h->cache_size > 0 ? &h->pmkid_cache[0] : NULL; }
+int wpa3_export_pmkid_hashcat(struct wpa3_handler *h, const char *f) { return 1; }
+int wpa3_export_pmkid_john(struct wpa3_handler *h, const char *f) { return 1; }
+int wpa3_export_pmkid_john_wpapsk(struct wpa3_handler *h, const char *f) { return 1; }
+int wpa3_is_pmf_enabled(const uint8_t *b) { return 1; }
+void wpa3_print_pmkid_list(struct wpa3_handler *h) {}
+void wpa3_print_transition_list(struct wpa3_handler *h) {}
+void wpa3_print_sae_info(struct wpa3_handler *h) {}
+
 /* ===== pixiewps_extended.c ===== */
 #include "pixiewps_extended.h"
 
