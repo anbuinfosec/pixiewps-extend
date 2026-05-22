@@ -240,24 +240,15 @@ int wps_has_sufficient_data(struct wps_session_enhanced *sess)
 
 uint32_t wps_get_required_attributes(uint8_t msg_type)
 {
-	uint32_t required = 0;
-	
+	/* Return bitmask of required attributes for message type */
 	switch (msg_type) {
 	case WPS_MSG_M1:
-		required |= (1 << WPS_ATTR_VERSION);
-		required |= (1 << WPS_ATTR_MESSAGE_TYPE);
-		required |= (1 << WPS_ATTR_PUBLIC_KEY);
-		required |= (1 << WPS_ATTR_REGISTRAR_NONCE);
-		break;
-	
+		return 0x0F;  /* VERSION | MESSAGE_TYPE | PUBLIC_KEY | REGISTRAR_NONCE */
 	case WPS_MSG_M3:
-		required |= (1 << WPS_ATTR_E_NONCE);
-		required |= (1 << WPS_ATTR_E_HASH1);
-		required |= (1 << WPS_ATTR_E_HASH2);
-		break;
+		return 0x07;  /* E_NONCE | E_HASH1 | E_HASH2 */
+	default:
+		return 0;
 	}
-	
-	return required;
 }
 
 int wps_check_attribute_completeness(const uint8_t *msg, uint16_t msg_len,
@@ -275,10 +266,12 @@ int wps_check_attribute_completeness(const uint8_t *msg, uint16_t msg_len,
 	for (uint16_t i = 0; i < msg_len - 4; i++) {
 		uint16_t attr_type = (msg[i] << 8) | msg[i + 1];
 		
-		if (attr_type == WPS_ATTR_VERSION) found |= (1 << WPS_ATTR_VERSION);
-		if (attr_type == WPS_ATTR_E_NONCE) found |= (1 << WPS_ATTR_E_NONCE);
-		if (attr_type == WPS_ATTR_E_HASH1) found |= (1 << WPS_ATTR_E_HASH1);
-		if (attr_type == WPS_ATTR_PUBLIC_KEY) found |= (1 << WPS_ATTR_PUBLIC_KEY);
+		if (attr_type == WPS_ATTR_VERSION) found |= 0x01;
+		if (attr_type == WPS_ATTR_E_NONCE) found |= 0x02;
+		if (attr_type == WPS_ATTR_E_HASH1) found |= 0x04;
+		if (attr_type == WPS_ATTR_PUBLIC_KEY) found |= 0x08;
+		if (attr_type == WPS_ATTR_MESSAGE_TYPE) found |= 0x01;
+		if (attr_type == WPS_ATTR_REGISTRAR_NONCE) found |= 0x08;
 	}
 	
 	/* Check if we found at least 70% of required */

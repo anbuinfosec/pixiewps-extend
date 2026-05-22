@@ -10,6 +10,7 @@
 
 #include <stdint.h>
 #include <time.h>
+#include "target_priority.h"
 
 /* Modern Router PRNG Types */
 #define PRNG_RTL819X          1   /* Realtek RTL8196C/RTL8197/RTL8198 */
@@ -27,12 +28,7 @@
 #define PRNG_AR9344_AR9331    13  /* TP-Link TL-WR841N v9+ */
 #define PRNG_GENERIC          99  /* Fallback generic PRNG */
 
-/* Vulnerability Levels */
-#define VULN_CRITICAL         5   /* Pixie Dust highly likely */
-#define VULN_HIGH             4   /* Pixie Dust possible */
-#define VULN_MEDIUM           3   /* Weak RNG */
-#define VULN_LOW              2   /* Strong RNG with minor issue */
-#define VULN_NONE             1   /* No known vulnerability */
+/* Note: Vulnerability levels defined in target_priority.h */
 
 /* Router Model Database Entry */
 struct router_model {

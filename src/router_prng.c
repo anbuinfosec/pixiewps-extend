@@ -7,6 +7,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <time.h>
+#include <math.h>
 #include "router_prng.h"
 
 /* Extended Router Model Database */
