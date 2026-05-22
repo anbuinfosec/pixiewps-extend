@@ -209,8 +209,6 @@ set(PIXIEWPS_SOURCES
 set(FRAMEWORK_SOURCES
     src/pixiewps_modules.c
     src/wifi_scanner.c
-    src/router_prng.c
-    src/wps_protocol.c
 )
 
 # Header files for reference
