@@ -384,13 +384,30 @@ void handshake_engine_free(struct handshake_engine *engine) {
 	if (engine) { free(engine->records); free(engine); }
 }
 
-int handshake_add_message(struct handshake_engine *e, const uint8_t *b, const uint8_t *s, uint8_t sl, const uint8_t *m, uint16_t ml) { return e ? 1 : 0; }
-int handshake_parse_eapol(const uint8_t *f, uint16_t fl, struct eapol_header *h) { return 0; }
-struct handshake_record *handshake_find_record(struct handshake_engine *e, const uint8_t *b) { return e && e->record_count > 0 ? &e->records[0] : NULL; }
+int handshake_add_message(struct handshake_engine *engine, const uint8_t *bssid,
+                          const uint8_t *client_mac, const uint8_t *frame,
+                          uint16_t frame_len) { return engine ? 1 : 0; }
+int handshake_parse_eapol(const uint8_t *frame, uint16_t frame_len,
+                          struct handshake_message *msg) { return 0; }
+int handshake_parse_wpa_key(const uint8_t *key_data, uint16_t data_len,
+                            struct wpa_key_frame *key_frame) { return 0; }
+int handshake_detect_message_number(const struct wpa_key_frame *key1,
+                                    const struct wpa_key_frame *key2) { return 0; }
+struct handshake_record *handshake_find_record(struct handshake_engine *engine,
+                                              const uint8_t *bssid,
+                                              const uint8_t *client_mac) { return engine && engine->record_count > 0 ? &engine->records[0] : NULL; }
 struct handshake_record *handshake_get_best_target(struct handshake_engine *e) { return e && e->record_count > 0 ? &e->records[0] : NULL; }
-int handshake_is_complete(struct handshake_record *r) { return r ? 1 : 0; }
-int handshake_export_pcap(struct handshake_engine *e, const char *f) { return 1; }
-int handshake_monitor_for_reassoc(struct handshake_engine *e, const uint8_t *b, uint32_t t) { return 1; }
+void handshake_update_priority(struct handshake_record *record) {}
+int handshake_is_complete(struct handshake_record *record) { return record ? 1 : 0; }
+int handshake_is_valid(struct handshake_record *record) { return record ? 1 : 0; }
+int handshake_verify_mic(struct handshake_record *record, const uint8_t *pmk,
+                        const uint8_t *ptk) { return 1; }
+int handshake_export_pcap(struct handshake_engine *engine, const char *filename) { return 1; }
+int handshake_export_hc22000(struct handshake_record *record, const char *filename) { return 1; }
+int handshake_send_deauth_burst(const uint8_t *interface, const uint8_t *bssid,
+                               const uint8_t *client_mac, uint8_t count) { return 1; }
+int handshake_monitor_for_reassoc(struct handshake_engine *engine,
+                                 const uint8_t *bssid) { return 1; }
 void handshake_cleanup_expired(struct handshake_engine *e, uint32_t t) {}
 uint32_t handshake_get_complete_count(struct handshake_engine *e) { return e ? 0 : 0; }
 uint32_t handshake_get_partial_count(struct handshake_engine *e) { return e ? 0 : 0; }
@@ -423,29 +440,33 @@ void wpa3_handler_free(struct wpa3_handler *handler) {
 	}
 }
 
-int wpa3_add_pmkid_candidate(struct wpa3_handler *h, const uint8_t *b, const uint8_t *s, uint8_t sl, const uint8_t *p) { return h ? 1 : 0; }
-int wpa3_detect_transition_mode(struct wpa3_handler *h, const uint8_t *b, const char *ss, uint8_t enc) { return 0; }
-struct wpa3_transition *wpa3_find_transition(struct wpa3_handler *h, const uint8_t *b) { return NULL; }
-int wpa3_sae_init_context(struct wpa3_handler *h, const uint8_t *m, const uint8_t *b, const char *s) { return 0; }
-int wpa3_is_vulnerable_to_cv2_1_114(struct wpa3_handler *h, const uint8_t *b) { return 0; }
-int wpa3_is_vulnerable_to_dragonblood(struct wpa3_handler *h, const uint8_t *b) { return 0; }
-int wpa3_exploit_dragonblood_side_channel(struct wpa3_handler *h, const uint8_t *b) { return 0; }
-int wpa3_is_transition_mode_vulnerable(struct wpa3_handler *h, const struct wpa3_transition *t) { return 0; }
-int wpa3_attack_transition_mode(struct wpa3_handler *h, const uint8_t *b, const char *p) { return 0; }
-int wpa3_crack_pmkid_online(struct wpa3_handler *h, const uint8_t *b, const char *w) { return 0; }
-int wpa3_crack_pmkid_offline(const uint8_t *p, const char *w) { return 0; }
-int wpa3_is_owe_curve_weak(struct wpa3_handler *h, const uint8_t *b) { return 0; }
-int wpa3_is_vulnerable_cve_2023_41042(struct wpa3_handler *h) { return 0; }
-int wpa3_is_dual_mode_device(struct wpa3_handler *h, const uint8_t *b) { return 0; }
-void wpa3_add_to_pmkid_cache(struct wpa3_handler *h, const uint8_t *p, const uint8_t *b, const uint8_t *s, uint8_t sl) {}
-struct pmkid_cache *wpa3_get_pmkid_by_priority(struct wpa3_handler *h) { return h && h->cache_size > 0 ? &h->pmkid_cache[0] : NULL; }
-int wpa3_export_pmkid_hashcat(struct wpa3_handler *h, const char *f) { return 1; }
-int wpa3_export_pmkid_john(struct wpa3_handler *h, const char *f) { return 1; }
-int wpa3_export_pmkid_john_wpapsk(struct wpa3_handler *h, const char *f) { return 1; }
-int wpa3_is_pmf_enabled(const uint8_t *b) { return 1; }
-void wpa3_print_pmkid_list(struct wpa3_handler *h) {}
-void wpa3_print_transition_list(struct wpa3_handler *h) {}
-void wpa3_print_sae_info(struct wpa3_handler *h) {}
+int wpa3_extract_pmkid(const uint8_t *ie_buf, uint16_t ie_len, uint8_t *pmkid) { return 0; }
+int wpa3_is_pmkid_candidate(const uint8_t *ie_buf, uint16_t ie_len) { return 0; }
+int wpa3_add_pmkid_candidate(struct wpa3_handler *handler, const uint8_t *bssid, 
+                            const uint8_t *pmkid) { return handler ? 1 : 0; }
+int wpa3_detect_transition_mode(struct wpa3_handler *handler, const uint8_t *bssid,
+                                const uint8_t *ssid, uint8_t ssid_len,
+                                uint8_t has_wpa3, uint8_t has_wpa2) { return 0; }
+struct wpa3_transition *wpa3_find_transition(struct wpa3_handler *handler, 
+                                            const uint8_t *bssid) { return NULL; }
+int wpa3_sae_init_context(struct wpa3_handler *handler, const uint8_t *mac,
+                          const uint8_t *bssid, const uint8_t *password, 
+                          uint16_t password_len) { return 0; }
+int wpa3_sae_parse_commit(struct sae_context *ctx, const uint8_t *frame, 
+                          uint16_t frame_len) { return 0; }
+int wpa3_sae_derive_pmk(struct sae_context *ctx) { return 0; }
+int wpa3_parse_pmf_capability(const uint8_t *ie_buf, uint16_t ie_len) { return 1; }
+int wpa3_validate_bip_mic(const uint8_t *frame, uint16_t frame_len, 
+                          const uint8_t *key, uint8_t key_len) { return 1; }
+int wpa3_parse_owe_transition(const uint8_t *ie_buf, uint16_t ie_len,
+                              uint8_t *ssid, uint8_t *ssid_len) { return 0; }
+int wpa3_owe_derive_psk(const uint8_t *dh_shared_secret, uint16_t secret_len,
+                        const uint8_t *bssid, const uint8_t *client_mac,
+                        uint8_t *psk) { return 0; }
+void wpa3_add_to_pmkid_cache(struct wpa3_handler *handler, const uint8_t *pmkid,
+                             const uint8_t *bssid, const uint8_t *ssid, 
+                             uint8_t ssid_len, uint32_t priority) {}
+struct pmkid_cache *wpa3_get_pmkid_by_priority(struct wpa3_handler *handler) { return handler && handler->cache_size > 0 ? &handler->pmkid_cache[0] : NULL; }
 
 /* ===== pixiewps_extended.c ===== */
 #include "pixiewps_extended.h"
