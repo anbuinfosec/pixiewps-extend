@@ -74,7 +74,8 @@ enum {
 	OPT_STATIC_PKE = 10,
 	OPT_BRUTE_FORCE = 11,
 	OPT_DETECT = 12,
-	OPT_RETRY = 13
+	OPT_RETRY = 13,
+	OPT_VERBOSITY = 14
 };
 
 static const char *option_string = "e:r:s:z:a:n:m:b:o:vj:5:7:SflVh?i:g:";
@@ -88,7 +89,7 @@ static const struct option long_options[] = {
 	{ "r-nonce",   required_argument, 0, 'm' },
 	{ "e-bssid",   required_argument, 0, 'b' },
 	{ "output",    required_argument, 0, 'o' },
-	{ "verbosity", required_argument, 0, 'v' },
+	{ "verbosity", required_argument, 0, OPT_VERBOSITY },
 	{ "jobs",      required_argument, 0, 'j' },
 	{ "dh-small",  no_argument,       0, 'S' },
 	{ "force",     no_argument,       0, 'f' },
@@ -1046,13 +1047,14 @@ memory_err:
 				}
 				break;
 			case 'v':
-				if (optarg) {
-					if (get_int(optarg, &wps->verbosity) != 0 || wps->verbosity < 1 || wps->verbosity > 3) {
-						snprintf(wps->error, 256, "\n [!] Bad verbosity level -- %s\n\n", optarg);
-						goto usage_err;
-					}
-				} else if (wps->verbosity < 3) {
+				if (wps->verbosity < 3) {
 					wps->verbosity++;
+				}
+				break;
+			case OPT_VERBOSITY:
+				if (get_int(optarg, &wps->verbosity) != 0 || wps->verbosity < 1 || wps->verbosity > 3) {
+					snprintf(wps->error, 256, "\n [!] Bad verbosity level -- %s\n\n", optarg);
+					goto usage_err;
 				}
 				break;
 			case 'V':
@@ -1137,10 +1139,13 @@ memory_err:
 				compat_interface_seen = 1;
 				break;
 			case OPT_BSSID:
+				free(wps->e_bssid);
 				wps->e_bssid = malloc(WPS_BSSID_LEN);
 				if (!wps->e_bssid)
 					goto memory_err;
 				if (hex_string_to_byte_array(optarg, wps->e_bssid, WPS_BSSID_LEN)) {
+					free(wps->e_bssid);
+					wps->e_bssid = 0;
 					snprintf(wps->error, 256, "\n [!] Bad enrollee MAC address -- %s\n\n", optarg);
 					goto usage_err;
 				}
@@ -1200,7 +1205,7 @@ memory_err:
 	if (compat_interface_seen || compat_hybrid_seen || compat_detect_seen ||
 			compat_bruteforce_seen || compat_static_pke_seen ||
 			compat_max_attempts || compat_retry) {
-		fprintf(stderr, " [*] Live capture/reaver-style flags detected; parsing in compatibility mode.\n");
+		fprintf(stderr, " [*] Live capture/reaver-style flags detected and accepted (currently ignored by offline engine).\n");
 	}
 
 	if (argc - optind != 0) {
