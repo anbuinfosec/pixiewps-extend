@@ -62,7 +62,23 @@ static int crack_first_half(struct global *wps, char *pin, const uint8_t *es1_ov
 static int crack_second_half(struct global *wps, char *pin);
 static int crack(struct global *wps, char *pin);
 
-static const char *option_string = "e:r:s:z:a:n:m:b:o:v:j:5:7:SflVh?";
+enum {
+	OPT_HELP = 0,
+	OPT_MODE = 1,
+	OPT_START = 2,
+	OPT_END = 3,
+	OPT_CSTART = 4,
+	OPT_CEND = 5,
+	OPT_BSSID = 7,
+	OPT_HYBRID = 8,
+	OPT_STATIC_PKE = 10,
+	OPT_BRUTE_FORCE = 11,
+	OPT_DETECT = 12,
+	OPT_RETRY = 13,
+	OPT_VERBOSITY = 14
+};
+
+static const char *option_string = "e:r:s:z:a:n:m:b:o:vj:5:7:SflVh?i:g:";
 static const struct option long_options[] = {
 	{ "pke",       required_argument, 0, 'e' },
 	{ "pkr",       required_argument, 0, 'r' },
@@ -73,18 +89,26 @@ static const struct option long_options[] = {
 	{ "r-nonce",   required_argument, 0, 'm' },
 	{ "e-bssid",   required_argument, 0, 'b' },
 	{ "output",    required_argument, 0, 'o' },
-	{ "verbosity", required_argument, 0, 'v' },
+	{ "verbosity", required_argument, 0, OPT_VERBOSITY },
 	{ "jobs",      required_argument, 0, 'j' },
 	{ "dh-small",  no_argument,       0, 'S' },
 	{ "force",     no_argument,       0, 'f' },
 	{ "length",    no_argument,       0, 'l' },
+	{ "interface", required_argument, 0, 'i' },
+	{ "bssid",     required_argument, 0, OPT_BSSID },
+	{ "hybrid",    no_argument,       0, OPT_HYBRID },
+	{ "max-attempts", required_argument, 0, 'g' },
+	{ "static-pke", no_argument,      0, OPT_STATIC_PKE },
+	{ "brute-force", no_argument,     0, OPT_BRUTE_FORCE },
+	{ "detect",    no_argument,       0, OPT_DETECT },
+	{ "retry",     required_argument, 0, OPT_RETRY },
 	{ "version",   no_argument,       0, 'V' },
-	{ "help",      no_argument,       0,  0  },
-	{ "mode",      required_argument, 0,  1  },
-	{ "start",     required_argument, 0,  2  },
-	{ "end",       required_argument, 0,  3  },
-	{ "cstart",    required_argument, 0,  4  },
-	{ "cend",      required_argument, 0,  5  },
+	{ "help",      no_argument,       0, OPT_HELP },
+	{ "mode",      required_argument, 0, OPT_MODE },
+	{ "start",     required_argument, 0, OPT_START },
+	{ "end",       required_argument, 0, OPT_END },
+	{ "cstart",    required_argument, 0, OPT_CSTART },
+	{ "cend",      required_argument, 0, OPT_CEND },
 	{ "m5-enc",    required_argument, 0, '5' },
 	{ "m7-enc",    required_argument, 0, '7' },
 	{  0,          no_argument,       0, 'h' },
@@ -899,6 +923,9 @@ int crack_with_retry(struct global *wps, char *pin, const struct retry_config *c
 int main(int argc, char **argv)
 {
 	struct global *wps;
+	int compat_interface_seen = 0, compat_hybrid_seen = 0, compat_detect_seen = 0;
+	int compat_bruteforce_seen = 0, compat_static_pke_seen = 0;
+	int compat_max_attempts = 0, compat_retry = 0;
 	if ((wps = calloc(1, sizeof(struct global)))) {
 		unsigned int cores = hardware_concurrency();
 		wps->jobs = cores == 0 ? 1 : cores;
@@ -1020,6 +1047,11 @@ memory_err:
 				}
 				break;
 			case 'v':
+				if (wps->verbosity < 3) {
+					wps->verbosity++;
+				}
+				break;
+			case OPT_VERBOSITY:
 				if (get_int(optarg, &wps->verbosity) != 0 || wps->verbosity < 1 || wps->verbosity > 3) {
 					snprintf(wps->error, 256, "\n [!] Bad verbosity level -- %s\n\n", optarg);
 					goto usage_err;
@@ -1049,7 +1081,7 @@ memory_err:
 			case 'h':
 				goto usage_err;
 				break;
-			case  0 :
+			case OPT_HELP:
 				if (!strcmp("help", long_options[long_index].name)) {
 					fprintf(stderr, v_usage, SHORT_VERSION,
 						p_mode_name[RT],
@@ -1063,7 +1095,7 @@ memory_err:
 					return ARG_ERROR;
 				}
 				goto usage_err;
-			case  1 :
+			case OPT_MODE:
 				if (!strcmp("mode", long_options[long_index].name)) {
 					if (parse_mode(optarg, p_mode, MODE_LEN)) {
 						snprintf(wps->error, 256, "\n [!] Bad modes -- %s\n\n", optarg);
@@ -1073,7 +1105,7 @@ memory_err:
 					break;
 				}
 				goto usage_err;
-			case  2 :
+			case OPT_START:
 				if (!strcmp("start", long_options[long_index].name)) {
 					if (get_unix_datetime(optarg, &(start_p))) {
 						snprintf(wps->error, 256, "\n [!] Bad starting point -- %s\n\n", optarg);
@@ -1082,7 +1114,7 @@ memory_err:
 					break;
 				}
 				goto usage_err;
-			case  3 :
+			case OPT_END:
 				if (!strcmp("end", long_options[long_index].name)) {
 					if (get_unix_datetime(optarg, &(end_p))) {
 						snprintf(wps->error, 256, "\n [!] Bad ending point -- %s\n\n", optarg);
@@ -1091,18 +1123,57 @@ memory_err:
 					break;
 				}
 				goto usage_err;
-			case  4 :
+			case OPT_CSTART:
 				if (!strcmp("cstart", long_options[long_index].name)) {
 					start_p = strtol(optarg, 0, 10);
 					break;
 				}
 				goto usage_err;
-			case  5 :
+			case OPT_CEND:
 				if (!strcmp("cend", long_options[long_index].name)) {
 					end_p = strtol(optarg, 0, 10);
 					break;
 				}
 				goto usage_err;
+			case 'i':
+				compat_interface_seen = 1;
+				break;
+			case OPT_BSSID:
+				free(wps->e_bssid);
+				wps->e_bssid = malloc(WPS_BSSID_LEN);
+				if (!wps->e_bssid)
+					goto memory_err;
+				if (hex_string_to_byte_array(optarg, wps->e_bssid, WPS_BSSID_LEN)) {
+					free(wps->e_bssid);
+					wps->e_bssid = 0;
+					snprintf(wps->error, 256, "\n [!] Bad enrollee MAC address -- %s\n\n", optarg);
+					goto usage_err;
+				}
+				break;
+			case OPT_HYBRID:
+				compat_hybrid_seen = 1;
+				break;
+			case OPT_STATIC_PKE:
+				compat_static_pke_seen = 1;
+				break;
+			case OPT_BRUTE_FORCE:
+				compat_bruteforce_seen = 1;
+				break;
+			case OPT_DETECT:
+				compat_detect_seen = 1;
+				break;
+			case OPT_RETRY:
+				if (get_int(optarg, &compat_retry) != 0 || compat_retry < 0) {
+					snprintf(wps->error, 256, "\n [!] Bad retry value -- %s\n\n", optarg);
+					goto usage_err;
+				}
+				break;
+			case 'g':
+				if (get_int(optarg, &compat_max_attempts) != 0 || compat_max_attempts < 1) {
+					snprintf(wps->error, 256, "\n [!] Bad max attempts value -- %s\n\n", optarg);
+					goto usage_err;
+				}
+				break;
 			case '5':
 				wps->m5_encr = malloc(ENC_SETTINGS_LEN);
 				if (!wps->m5_encr)
@@ -1129,6 +1200,12 @@ memory_err:
 				return ARG_ERROR;
 		}
 		opt = getopt_long(argc, argv, option_string, long_options, &long_index);
+	}
+
+	if (compat_interface_seen || compat_hybrid_seen || compat_detect_seen ||
+			compat_bruteforce_seen || compat_static_pke_seen ||
+			compat_max_attempts || compat_retry) {
+		fprintf(stderr, " [*] Live capture/reaver-style flags detected and accepted (currently ignored by offline engine).\n");
 	}
 
 	if (argc - optind != 0) {
