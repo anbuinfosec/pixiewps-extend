@@ -1,94 +1,121 @@
-name: Package Release
+name: Build and Release Pixiewps
 
 on:
   push:
     tags:
       - 'v*'
-  workflow_dispatch:
 
 jobs:
-  build-and-release:
+  build:
+    name: Build for ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]
         include:
+          # Linux x86_64
           - os: ubuntu-latest
-            artifact_name: pixiewps-extend-linux-arm64
-            build_cmd: |
-              mkdir -p build && cd build
-              cmake -DCMAKE_BUILD_TYPE=Release ..
-              cmake --build . --config Release
+            target: linux-x86_64
+            artifact_name: pixiewps
+            release_name: pixiewps-linux-x86_64
+          # Windows x86_64
+          - os: windows-latest
+            target: windows-x86_64
+            artifact_name: pixiewps.exe
+            release_name: pixiewps-windows-x86_64.exe
+          # macOS (Apple Silicon / Intel Universal)
           - os: macos-latest
-            artifact_name: pixiewps-extend-macos-arm64
-            build_cmd: |
-              mkdir -p build && cd build
-              cmake -DCMAKE_BUILD_TYPE=Release ..
-              cmake --build . --config Release
+            target: macos-universal
+            artifact_name: pixiewps
+            release_name: pixiewps-macos
 
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout source code
+        uses: actions/checkout@v4
 
-      - name: Install dependencies (Ubuntu)
-        if: runner.os == 'Linux'
+      - name: Install Dependencies (Linux)
+        if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get update
           sudo apt-get install -y cmake build-essential
 
-      - name: Install dependencies (macOS)
-        if: runner.os == 'macOS'
+      - name: Configure and Build (Linux/macOS)
+        if: matrix.os != 'windows-latest'
         run: |
-          brew install cmake
+          mkdir build && cd build
+          cmake ..
+          make
+          strip ${{ matrix.artifact_name }} || true
 
-      - name: Build
-        run: ${{ matrix.build_cmd }}
+      - name: Configure and Build (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          mkdir build
+          cd build
+          cmake ..
+          cmake --build . --config Release
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v3
+      - name: Prepare Artifact
+        shell: bash
+        run: |
+          mkdir dist
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            cp build/Release/${{ matrix.artifact_name }} dist/${{ matrix.release_name }}
+          else
+            cp build/${{ matrix.artifact_name }} dist/${{ matrix.release_name }}
+          fi
+
+      - name: Upload Artifact to Workflow
+        uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact_name }}
-          path: build/pixiewps-1.2
+          name: ${{ matrix.release_name }}
+          path: dist/${{ matrix.release_name }}
 
-  create-release:
-    needs: build-and-release
+  # Note: Termux must be built separately due to Android environment constraints
+  build-termux:
+    name: Build for Termux (aarch64)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout source code
+        uses: actions/checkout@v4
 
-      - name: Download artifacts
-        uses: actions/download-artifact@v3
+      - name: Set up QEMU for ARM64 Emulation
+        uses: docker/setup-qemu-action@v3
 
-      - name: Create Release
-        uses: softprops/action-gh-release@v1
+      - name: Build inside Termux Docker Environment
+        run: |
+          docker run --rm -v ${{ github.workspace }}:/workspace -w /workspace termux/termux-docker:aarch64-latest bash -c "
+            pkg update -y && pkg install -y cmake clang make binutils
+            mkdir -p build-termux && cd build-termux
+            cmake ..
+            make
+            strip pixiewps
+            cp pixiewps ../pixiewps-termux-aarch64
+          "
+
+      - name: Upload Termux Artifact
+        uses: actions/upload-artifact@v4
         with:
-          files: |
-            pixiewps-extend-linux-arm64/pixiewps-1.2
-            pixiewps-extend-macos-arm64/pixiewps-1.2
-          body: |
-            # pixiewps-extend v${{ github.ref_name }}
-            
-            Enhanced WPS attack tool with worldwide router database support.
-            
-            ## Features
-            - 65+ router database with regional optimization
-            - Auto-detection with confidence scoring
-            - Support for 20+ router modes
-            - Retry mechanism with intelligent backoff
-            - Statistics tracking
-            
-            ## Installation
-            
-            ### Termux
-            ```bash
-            pkg install pixiewps-extend
-            ```
-            
-            ### Manual
-            ```bash
-            wget https://github.com/anbuinfosec/pixiewps-extend/releases/download/${{ github.ref_name }}/pixiewps-1.2
-            chmod +x pixiewps-1.2
-            ./pixiewps-1.2 --help
-            ```
-            
-            ## Modified by @anbuinfosec
-            GitHub: https://github.com/anbuinfosec/pixiewps-extend
+          name: pixiewps-termux-aarch64
+          path: pixiewps-termux-aarch64
+
+  release:
+    name: Publish GitHub Release
+    needs: [build, build-termux]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: all-artifacts
+          merge-multiple: true
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: all-artifacts/*
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.token }}
