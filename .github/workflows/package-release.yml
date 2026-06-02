@@ -1,121 +1,178 @@
 name: Build and Release Pixiewps
 
 on:
-  push:
-    tags:
-      - 'v*'
+push:
+tags:
+- 'v*'
+
+permissions:
+contents: write
 
 jobs:
-  build:
-    name: Build for ${{ matrix.target }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        include:
-          # Linux x86_64
-          - os: ubuntu-latest
-            target: linux-x86_64
-            artifact_name: pixiewps
-            release_name: pixiewps-linux-x86_64
-          # Windows x86_64
-          - os: windows-latest
-            target: windows-x86_64
-            artifact_name: pixiewps.exe
-            release_name: pixiewps-windows-x86_64.exe
-          # macOS (Apple Silicon / Intel Universal)
-          - os: macos-latest
-            target: macos-universal
-            artifact_name: pixiewps
-            release_name: pixiewps-macos
+build:
+name: Build (${{ matrix.target }})
+runs-on: ${{ matrix.os }}
 
-    steps:
-      - name: Checkout source code
-        uses: actions/checkout@v4
+strategy:
+  fail-fast: false
+  matrix:
+    include:
+      - os: ubuntu-latest
+        target: linux-x86_64
+        artifact_name: pixiewps
+        release_name: pixiewps-linux-x86_64
 
-      - name: Install Dependencies (Linux)
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y cmake build-essential
+      - os: windows-latest
+        target: windows-x86_64
+        artifact_name: pixiewps.exe
+        release_name: pixiewps-windows-x86_64.exe
 
-      - name: Configure and Build (Linux/macOS)
-        if: matrix.os != 'windows-latest'
-        run: |
-          mkdir build && cd build
-          cmake ..
-          make
-          strip ${{ matrix.artifact_name }} || true
+      - os: macos-latest
+        target: macos-universal
+        artifact_name: pixiewps
+        release_name: pixiewps-macos
 
-      - name: Configure and Build (Windows)
-        if: matrix.os == 'windows-latest'
-        run: |
-          mkdir build
-          cd build
-          cmake ..
-          cmake --build . --config Release
+steps:
+  - name: Checkout source
+    uses: actions/checkout@v4
 
-      - name: Prepare Artifact
-        shell: bash
-        run: |
-          mkdir dist
-          if [ "${{ matrix.os }}" = "windows-latest" ]; then
-            cp build/Release/${{ matrix.artifact_name }} dist/${{ matrix.release_name }}
-          else
-            cp build/${{ matrix.artifact_name }} dist/${{ matrix.release_name }}
-          fi
+  - name: Install dependencies (Ubuntu)
+    if: runner.os == 'Linux'
+    run: |
+      sudo apt-get update
+      sudo apt-get install -y \
+        build-essential \
+        cmake \
+        make \
+        gcc \
+        g++
 
-      - name: Upload Artifact to Workflow
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.release_name }}
-          path: dist/${{ matrix.release_name }}
+  - name: Configure
+    shell: bash
+    run: |
+      mkdir -p build
+      cd build
+      cmake ..
 
-  # Note: Termux must be built separately due to Android environment constraints
-  build-termux:
-    name: Build for Termux (aarch64)
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout source code
-        uses: actions/checkout@v4
+  - name: Build Linux/macOS
+    if: runner.os != 'Windows'
+    shell: bash
+    run: |
+      cd build
+      make -j$(nproc || sysctl -n hw.ncpu)
 
-      - name: Set up QEMU for ARM64 Emulation
-        uses: docker/setup-qemu-action@v3
+  - name: Strip Binary
+    if: runner.os != 'Windows'
+    shell: bash
+    run: |
+      strip build/${{ matrix.artifact_name }} || true
 
-      - name: Build inside Termux Docker Environment
-        run: |
-          docker run --rm -v ${{ github.workspace }}:/workspace -w /workspace termux/termux-docker:aarch64-latest bash -c "
-            pkg update -y && pkg install -y cmake clang make binutils
-            mkdir -p build-termux && cd build-termux
-            cmake ..
-            make
-            strip pixiewps
-            cp pixiewps ../pixiewps-termux-aarch64
-          "
+  - name: Build Windows
+    if: runner.os == 'Windows'
+    run: |
+      cmake --build build --config Release
 
-      - name: Upload Termux Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: pixiewps-termux-aarch64
-          path: pixiewps-termux-aarch64
+  - name: Prepare Linux/macOS Artifact
+    if: runner.os != 'Windows'
+    shell: bash
+    run: |
+      mkdir -p dist
+      cp build/${{ matrix.artifact_name }} \
+         dist/${{ matrix.release_name }}
 
-  release:
-    name: Publish GitHub Release
-    needs: [build, build-termux]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: Download all build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: all-artifacts
-          merge-multiple: true
+  - name: Prepare Windows Artifact
+    if: runner.os == 'Windows'
+    shell: bash
+    run: |
+      mkdir -p dist
+      cp build/Release/${{ matrix.artifact_name }} \
+         dist/${{ matrix.release_name }}
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: all-artifacts/*
-          draft: false
-          prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.token }}
+  - name: Upload Artifact
+    uses: actions/upload-artifact@v4
+    with:
+      name: ${{ matrix.release_name }}
+      path: dist/${{ matrix.release_name }}
+
+build-termux:
+name: Build Termux AArch64
+runs-on: ubuntu-latest
+
+steps:
+  - name: Checkout source
+    uses: actions/checkout@v4
+
+  - name: Install Cross Compiler
+    run: |
+      sudo apt-get update
+      sudo apt-get install -y \
+        cmake \
+        make \
+        gcc-aarch64-linux-gnu \
+        g++-aarch64-linux-gnu
+
+  - name: Create Toolchain File
+    run: |
+      cat > toolchain-aarch64.cmake << 'EOF'
+      set(CMAKE_SYSTEM_NAME Linux)
+      set(CMAKE_SYSTEM_PROCESSOR aarch64)
+
+      set(CMAKE_C_COMPILER aarch64-linux-gnu-gcc)
+      set(CMAKE_CXX_COMPILER aarch64-linux-gnu-g++)
+      EOF
+
+  - name: Configure Build
+    run: |
+      mkdir -p build-termux
+      cd build-termux
+
+      cmake .. \
+        -DCMAKE_TOOLCHAIN_FILE=../toolchain-aarch64.cmake
+
+  - name: Build
+    run: |
+      cd build-termux
+      make -j$(nproc)
+
+  - name: Strip Binary
+    run: |
+      aarch64-linux-gnu-strip build-termux/pixiewps || true
+
+  - name: Prepare Artifact
+    run: |
+      cp build-termux/pixiewps pixiewps-termux-aarch64
+
+  - name: Upload Termux Artifact
+    uses: actions/upload-artifact@v4
+    with:
+      name: pixiewps-termux-aarch64
+      path: pixiewps-termux-aarch64
+
+release:
+name: Publish GitHub Release
+needs:
+- build
+- build-termux
+
+runs-on: ubuntu-latest
+
+steps:
+  - name: Download Artifacts
+    uses: actions/download-artifact@v4
+    with:
+      path: release-files
+      merge-multiple: true
+
+  - name: List Files
+    run: |
+      ls -lah release-files
+
+  - name: Create Release
+    uses: softprops/action-gh-release@v2
+    with:
+      files: release-files/*
+      draft: false
+      prerelease: false
+      generate_release_notes: true
+    env:
+      GITHUB_TOKEN: ${{ secrets.token }}
