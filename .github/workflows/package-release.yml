@@ -1,178 +1,178 @@
 name: Build and Release Pixiewps
 
 on:
-push:
-tags:
-- 'v*'
+  push:
+    tags:
+      - 'v*'
 
 permissions:
-contents: write
+  contents: write
 
 jobs:
-build:
-name: Build (${{ matrix.target }})
-runs-on: ${{ matrix.os }}
+  build:
+    name: Build (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
 
-strategy:
-  fail-fast: false
-  matrix:
-    include:
-      - os: ubuntu-latest
-        target: linux-x86_64
-        artifact_name: pixiewps
-        release_name: pixiewps-linux-x86_64
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: linux-x86_64
+            artifact_name: pixiewps
+            release_name: pixiewps-linux-x86_64
 
-      - os: windows-latest
-        target: windows-x86_64
-        artifact_name: pixiewps.exe
-        release_name: pixiewps-windows-x86_64.exe
+          - os: windows-latest
+            target: windows-x86_64
+            artifact_name: pixiewps.exe
+            release_name: pixiewps-windows-x86_64.exe
 
-      - os: macos-latest
-        target: macos-universal
-        artifact_name: pixiewps
-        release_name: pixiewps-macos
+          - os: macos-latest
+            target: macos-universal
+            artifact_name: pixiewps
+            release_name: pixiewps-macos
 
-steps:
-  - name: Checkout source
-    uses: actions/checkout@v4
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
 
-  - name: Install dependencies (Ubuntu)
-    if: runner.os == 'Linux'
-    run: |
-      sudo apt-get update
-      sudo apt-get install -y \
-        build-essential \
-        cmake \
-        make \
-        gcc \
-        g++
+      - name: Install dependencies (Ubuntu)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            make \
+            gcc \
+            g++
 
-  - name: Configure
-    shell: bash
-    run: |
-      mkdir -p build
-      cd build
-      cmake ..
+      - name: Configure
+        shell: bash
+        run: |
+          mkdir -p build
+          cd build
+          cmake ..
 
-  - name: Build Linux/macOS
-    if: runner.os != 'Windows'
-    shell: bash
-    run: |
-      cd build
-      make -j$(nproc || sysctl -n hw.ncpu)
+      - name: Build Linux/macOS
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          cd build
+          make -j$(nproc || sysctl -n hw.ncpu)
 
-  - name: Strip Binary
-    if: runner.os != 'Windows'
-    shell: bash
-    run: |
-      strip build/${{ matrix.artifact_name }} || true
+      - name: Strip Binary
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          strip build/${{ matrix.artifact_name }} || true
 
-  - name: Build Windows
-    if: runner.os == 'Windows'
-    run: |
-      cmake --build build --config Release
+      - name: Build Windows
+        if: runner.os == 'Windows'
+        run: |
+          cmake --build build --config Release
 
-  - name: Prepare Linux/macOS Artifact
-    if: runner.os != 'Windows'
-    shell: bash
-    run: |
-      mkdir -p dist
-      cp build/${{ matrix.artifact_name }} \
-         dist/${{ matrix.release_name }}
+      - name: Prepare Linux/macOS Artifact
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          mkdir -p dist
+          cp build/${{ matrix.artifact_name }} \
+            dist/${{ matrix.release_name }}
 
-  - name: Prepare Windows Artifact
-    if: runner.os == 'Windows'
-    shell: bash
-    run: |
-      mkdir -p dist
-      cp build/Release/${{ matrix.artifact_name }} \
-         dist/${{ matrix.release_name }}
+      - name: Prepare Windows Artifact
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          mkdir -p dist
+          cp build/Release/${{ matrix.artifact_name }} \
+            dist/${{ matrix.release_name }}
 
-  - name: Upload Artifact
-    uses: actions/upload-artifact@v4
-    with:
-      name: ${{ matrix.release_name }}
-      path: dist/${{ matrix.release_name }}
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.release_name }}
+          path: dist/${{ matrix.release_name }}
 
-build-termux:
-name: Build Termux AArch64
-runs-on: ubuntu-latest
+  build-termux:
+    name: Build Termux AArch64
+    runs-on: ubuntu-latest
 
-steps:
-  - name: Checkout source
-    uses: actions/checkout@v4
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
 
-  - name: Install Cross Compiler
-    run: |
-      sudo apt-get update
-      sudo apt-get install -y \
-        cmake \
-        make \
-        gcc-aarch64-linux-gnu \
-        g++-aarch64-linux-gnu
+      - name: Install Cross Compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            cmake \
+            make \
+            gcc-aarch64-linux-gnu \
+            g++-aarch64-linux-gnu
 
-  - name: Create Toolchain File
-    run: |
-      cat > toolchain-aarch64.cmake << 'EOF'
-      set(CMAKE_SYSTEM_NAME Linux)
-      set(CMAKE_SYSTEM_PROCESSOR aarch64)
+      - name: Create Toolchain File
+        run: |
+          cat > toolchain-aarch64.cmake << 'EOF_TOOLCHAIN'
+          set(CMAKE_SYSTEM_NAME Linux)
+          set(CMAKE_SYSTEM_PROCESSOR aarch64)
 
-      set(CMAKE_C_COMPILER aarch64-linux-gnu-gcc)
-      set(CMAKE_CXX_COMPILER aarch64-linux-gnu-g++)
-      EOF
+          set(CMAKE_C_COMPILER aarch64-linux-gnu-gcc)
+          set(CMAKE_CXX_COMPILER aarch64-linux-gnu-g++)
+          EOF_TOOLCHAIN
 
-  - name: Configure Build
-    run: |
-      mkdir -p build-termux
-      cd build-termux
+      - name: Configure Build
+        run: |
+          mkdir -p build-termux
+          cd build-termux
 
-      cmake .. \
-        -DCMAKE_TOOLCHAIN_FILE=../toolchain-aarch64.cmake
+          cmake .. \
+            -DCMAKE_TOOLCHAIN_FILE=../toolchain-aarch64.cmake
 
-  - name: Build
-    run: |
-      cd build-termux
-      make -j$(nproc)
+      - name: Build
+        run: |
+          cd build-termux
+          make -j$(nproc)
 
-  - name: Strip Binary
-    run: |
-      aarch64-linux-gnu-strip build-termux/pixiewps || true
+      - name: Strip Binary
+        run: |
+          aarch64-linux-gnu-strip build-termux/pixiewps || true
 
-  - name: Prepare Artifact
-    run: |
-      cp build-termux/pixiewps pixiewps-termux-aarch64
+      - name: Prepare Artifact
+        run: |
+          cp build-termux/pixiewps pixiewps-termux-aarch64
 
-  - name: Upload Termux Artifact
-    uses: actions/upload-artifact@v4
-    with:
-      name: pixiewps-termux-aarch64
-      path: pixiewps-termux-aarch64
+      - name: Upload Termux Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pixiewps-termux-aarch64
+          path: pixiewps-termux-aarch64
 
-release:
-name: Publish GitHub Release
-needs:
-- build
-- build-termux
+  release:
+    name: Publish GitHub Release
+    needs:
+      - build
+      - build-termux
 
-runs-on: ubuntu-latest
+    runs-on: ubuntu-latest
 
-steps:
-  - name: Download Artifacts
-    uses: actions/download-artifact@v4
-    with:
-      path: release-files
-      merge-multiple: true
+    steps:
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-files
+          merge-multiple: true
 
-  - name: List Files
-    run: |
-      ls -lah release-files
+      - name: List Files
+        run: |
+          ls -lah release-files
 
-  - name: Create Release
-    uses: softprops/action-gh-release@v2
-    with:
-      files: release-files/*
-      draft: false
-      prerelease: false
-      generate_release_notes: true
-    env:
-      GITHUB_TOKEN: ${{ secrets.token }}
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release-files/*
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
