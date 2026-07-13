@@ -333,6 +333,8 @@ char usage[] =
 	"   -i, --interface   : Compatibility flag for live capture workflows\n"
 	"       --bssid       : Alias for --e-bssid\n"
 	"       --hybrid      : Compatibility flag (pixie + brute-force mode)\n"
+	"   -K, --pixie-dust  : Compatibility alias for Pixie Dust workflows\n"
+	"   -Z, --pixie-dust  : Compatibility alias for Pixie Dust workflows\n"
 	"   -g, --max-attempts: Compatibility limit for online attempts\n"
 	"       --static-pke  : Compatibility flag for static PKE mode\n"
 	"       --brute-force : Compatibility flag for online brute-force mode\n"

@@ -71,6 +71,7 @@ enum {
 	OPT_CEND = 5,
 	OPT_BSSID = 7,
 	OPT_HYBRID = 8,
+	OPT_PIXIE_DUST = 9,
 	OPT_STATIC_PKE = 10,
 	OPT_BRUTE_FORCE = 11,
 	OPT_DETECT = 12,
@@ -78,7 +79,7 @@ enum {
 	OPT_VERBOSITY = 14
 };
 
-static const char *option_string = "e:r:s:z:a:n:m:b:o:vj:5:7:SflVh?i:g:";
+static const char *option_string = "e:r:s:z:a:n:m:b:o:vj:5:7:SflVh?i:g:KZ";
 static const struct option long_options[] = {
 	{ "pke",       required_argument, 0, 'e' },
 	{ "pkr",       required_argument, 0, 'r' },
@@ -97,6 +98,7 @@ static const struct option long_options[] = {
 	{ "interface", required_argument, 0, 'i' },
 	{ "bssid",     required_argument, 0, OPT_BSSID },
 	{ "hybrid",    no_argument,       0, OPT_HYBRID },
+	{ "pixie-dust", no_argument,       0, OPT_PIXIE_DUST },
 	{ "max-attempts", required_argument, 0, 'g' },
 	{ "static-pke", no_argument,      0, OPT_STATIC_PKE },
 	{ "brute-force", no_argument,     0, OPT_BRUTE_FORCE },
@@ -904,7 +906,11 @@ int crack_with_retry(struct global *wps, char *pin, const struct retry_config *c
 		
 		if (attempt < config->max_retries - 1) {
 			log_attempt(2, " (Waiting %u ms before retry...)", backoff_ms);
-			usleep(backoff_ms * 1000);  /* Convert ms to microseconds */
+			struct timespec ts = {
+				.tv_sec = backoff_ms / 1000,
+				.tv_nsec = (backoff_ms % 1000) * 1000000UL
+			};
+			nanosleep(&ts, NULL);
 		}
 		
 		stats.retries_used++;
@@ -924,7 +930,7 @@ int main(int argc, char **argv)
 {
 	struct global *wps;
 	int compat_interface_seen = 0, compat_hybrid_seen = 0, compat_detect_seen = 0;
-	int compat_bruteforce_seen = 0, compat_static_pke_seen = 0;
+	int compat_pixie_dust_seen = 0, compat_bruteforce_seen = 0, compat_static_pke_seen = 0;
 	int compat_max_attempts = 0, compat_retry = 0;
 	if ((wps = calloc(1, sizeof(struct global)))) {
 		unsigned int cores = hardware_concurrency();
@@ -1152,6 +1158,13 @@ memory_err:
 				break;
 			case OPT_HYBRID:
 				compat_hybrid_seen = 1;
+				break;
+			case 'K':
+			case 'Z':
+				compat_pixie_dust_seen = 1;
+				break;
+			case OPT_PIXIE_DUST:
+				compat_pixie_dust_seen = 1;
 				break;
 			case OPT_STATIC_PKE:
 				compat_static_pke_seen = 1;
