@@ -36,7 +36,10 @@ TCSRC = $(patsubst ./%,$(SRCDIR)/crypto/tc/%,$(TC_SRCS))
 TCOBJS = $(TCSRC:.c=.o)
 
 # Extended framework sources
-FRAMEWORK_SOURCES = $(SRCDIR)/pixiewps_modules.c $(SRCDIR)/wifi_scanner.c \
+# The legacy pixiewps_modules.c file contains duplicate global symbols when linked
+# together with the core implementation. Keep the standalone build stable by
+# compiling only the compatible support sources.
+FRAMEWORK_SOURCES = $(SRCDIR)/wifi_scanner.c \
                    $(SRCDIR)/router_prng.c $(SRCDIR)/wps_protocol.c
 
 SOURCE = $(SRCDIR)/pixiewps.c

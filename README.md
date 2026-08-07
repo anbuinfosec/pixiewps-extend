@@ -37,3 +37,7 @@ Run the help command:
 ## Notes
 
 Use this tool only on networks you own or are authorized to test. Make sure your wireless environment supports the required operations.
+
+## Open-source credit
+
+This repository builds on the original Pixiewps work by wiire and includes compatibility and integration work by @anbuinfosec. Please preserve attribution when redistributing or modifying the source.
